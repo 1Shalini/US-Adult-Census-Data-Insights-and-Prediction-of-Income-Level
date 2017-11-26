@@ -556,4 +556,152 @@ class(Accuracy)
 gg<-ggplot(Accuracy,aes(x=Model,y=Accuracy,fill=Model))+geom_bar(stat = 'identity')+theme_bw()+ggtitle('Accuracies of Models')+ geom_hline(yintercept = 0.85,color='red')
 gg
 ##############
+censusdata <- read.csv("C://Users/SHALINI SONI/Desktop/Ryerson-imp/CKME136/adult.csv", header = T, sep = ",",na.strings = "?")
+## view the dataset
+View(censusdata)
+## checking dimensions of the censusdata
+dim(censusdata)
+## 32561    15
+### checking na's in the dataset.
+any(is.na(censusdata))
+# TRUE
+sum(is.na(censusdata))
+# 4262
+any(is.na(censusdata))
+# TRUE
+## Checking Duplicates in the dataset
+checkDup<-as.data.frame(censusdata[duplicated(censusdata),])
+#checking the dimensions of the dataset
+dim(checkDup)
+# 24 15
+## Removing duplicate records
+afterDupRM<-as.data.frame(censusdata[!duplicated(censusdata),])
+##checking the dimesions of datasets after removing the duplicates
+dim(afterDupRM)
+# 32537    15
+censusdata<-as.data.frame(afterDupRM)
+
+### Remove the NA's from the dataset
+newdata <- na.omit(censusdata)
+censusdata<-as.data.frame(newdata)
+#dimensions of dataset after removing NA's
+dim(censusdata)
+# 30139    15
+ls(censusdata)
+## [1] "age"            "capital gain"   "capital loss"   "education"      "education.num" 
+# [6] "fnlwgt"         "hours per week" "income"         "marital status" "native country"
+# [11] "occupation"     "race"           "relationship"   "sex"            "workclass" 
+str(censusdata)
+class(censusdata)
+# "data.frame"
+summary(censusdata)
+summary(censusdata$income)
+censusdata$age_new <- ifelse(censusdata$age <25,"young",ifelse(censusdata$age >=25 & censusdata$age <35,"young prof.",ifelse(censusdata$age >= 35 & censusdata$age<60,"professional",ifelse(censusdata$age >=60 & censusdata$age <80,"Retired","old"))))
+#View(censusdata$age_new)
+### created a new variable income_new with 0,1
+censusdata$income_new <- ifelse(censusdata$income =='<=50K',0,1)
+View(censusdata)
+censusdata$hoursperweek<- ifelse(censusdata$hours.per.week <=25,"prt_time",ifelse(censusdata$hours.per.week >25 & censusdata$hours.per.week <=40,"full_time",ifelse(censusdata$hours.per.week >40 & censusdata$hours.per.week <=60,"ovr_time","workalcohlic")))
+View(censusdata)
+new_pattern1 <- censusdata_new[which(censusdata$income_new==0),]
+new_pattern2 <- censusdata_new[which(censusdata$income_new==1),]
+View(new_pattern1)
+new_pattern1$income <- NULL
+new_pattern2$income <- NULL
+censusdata$age_new <- as.factor(censusdata$age_new)
+censusdata$hoursperweek <- as.factor(censusdata$hoursperweek)
+###remove numerical data 
+censusdata_new <- censusdata[,-c(1,3,5,11,12,13,17)]
+new_pattern1 <- censusdata_new[which(censusdata$income_new==0),]
+new_pattern2 <- censusdata_new[which(censusdata$income_new==1),]
+#new_pattern1$income <- NULL
+#new_pattern2$income <- NULL
+#new_pattern1$income_new <- NULL
+#new_pattern2$income_new <- NULL
+###--- Apriori Algorithm to test the association --###
+
+###Association rule
+
+## (a) Change into transactions type
+dataForAR <- as(censusdata_new, "transactions")
+new_pattern1$race<-NULL
+new_pattern1$native.country<-NULL
+new_pattern1$marital.status<-NULL
+
+new_pattern2$race<-NULL
+new_pattern2$native.country<-NULL
+new_pattern2$marital.status<-NULL
+
+
+dataForAR_one <- as(new_pattern1, "transactions")
+dataForAR_two <- as(new_pattern2, "transactions")
+
+summary( itemFrequency(dataForAR) )
+
+# train apriori
+rules_one <- apriori( 
+  dataForAR_one,
+  
+  # the min/max len denotes the min/max number of items in a itemset
+  parameter = list( support = 0.1, confidence = 0.95, minlen = 5, maxlen = 6 ),
+  
+  # for appearance we can specify we only want rules with rhs 
+  # containing "Survived" only (we then specfiy the default parameter
+  # to 'lhs' to tell the algorithm that every other variables that
+  # has not been specified can go in the left hand side
+  appearance = list( rhs = c( 'income=<=50K', 'income=>50K' ), default = 'lhs' ),
+  
+  # don't print the algorthm's training message
+  control = list( verbose = FALSE )
+)
+
+## -- Viewing the output (a) First convert into a data table
+library(data.table)
+rules_dt_one <- data.table( lhs = labels( lhs(rules_one) ), 
+                        rhs = labels( rhs(rules_one) ), 
+                        quality(rules_one) )[ order(-lift), ]
+
+table(rules_dt_one$rhs)
+View(rules_dt_one)
+
+
+################## >50K income
+rules_two <- apriori( 
+  dataForAR_two,
+  parameter = list( support = 0.2, confidence = 0.95, minlen = 5, maxlen = 6 ),
+  appearance = list( rhs = c( 'income=<=50K', 'income=>50K' ), default = 'lhs' ),
+  control = list( verbose = FALSE )
+)
+
+## -- Viewing the output (a) First convert into a data table
+##library(data.table)
+rules_dt_two <- data.table( lhs = labels( lhs(rules_two) ), 
+                            rhs = labels( rhs(rules_two) ), 
+                            quality(rules_two) )[ order(-lift), ]
+
+table(rules_dt_two$rhs)
+View(rules_dt_two )
+
+DATAFRAME(rules_one)
+DATAFRAME(rules_two)
+DATAFRAME(rules_two, separate = TRUE, setStart = '', itemSep = ',', setEnd = '')
+###############################
+########### kmode..
+### clustering rule
+library(MASS)
+library(klaR)
+cat1 <- kmodes(new_pattern1[,-6],2)
+cat2 <- kmodes(new_pattern2[,-6],2)
+   cat1$cluster
+cat1$modes
+cat2$cluster  
+cat2$modes
+library(fpc)
+library(cluster)
+plotcluster(new_pattern1, cat1$cluster)
+clusplot(new_pattern1, cat1$cluster, color=TRUE, shade=TRUE, 
+         labels=2, lines=0)
+plot(new_pattern1,col=cat1$cluster)
+#plot(pattern1,col=cat1$cluster)
+View(new_pattern1)
 
